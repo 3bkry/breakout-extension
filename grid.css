@@ -1,0 +1,35 @@
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #131722;
+    /* TradingView Dark Theme Background */
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.grid-container {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    gap: 2px;
+    background-color: #0b0e14;
+    /* Border color between iframes */
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: #131722;
+}
+
+.empty-message {
+    color: #c8d0db;
+    text-align: center;
+    margin-top: 50px;
+    font-size: 24px;
+    font-weight: 600;
+}

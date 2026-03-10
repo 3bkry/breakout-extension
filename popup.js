@@ -23,7 +23,6 @@
     const openChartsBtn = document.getElementById('openChartsBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const filterBar = document.getElementById('filterBar');
-    const loopToggle = document.getElementById('loopToggle');
 
     // ── Save Checked Set ──
     async function saveChecked() {
@@ -32,13 +31,10 @@
 
     // ── Load from cache ONLY. Never auto-fetch. ──
     async function init() {
-        const cached = await chrome.storage.local.get([CACHE_KEY, CHECKED_CACHE_KEY, LOOP_CACHE_KEY]);
+        const cached = await chrome.storage.local.get([CACHE_KEY, CHECKED_CACHE_KEY]);
 
         if (cached[CHECKED_CACHE_KEY]) {
             checkedSet = new Set(cached[CHECKED_CACHE_KEY]);
-        }
-        if (cached[LOOP_CACHE_KEY] !== undefined) {
-            loopToggle.checked = cached[LOOP_CACHE_KEY];
         }
 
         if (cached[CACHE_KEY] && cached[CACHE_KEY].length > 0) {
@@ -325,9 +321,6 @@
         });
     }
 
-    loopToggle.addEventListener('change', () => {
-        chrome.storage.local.set({ [LOOP_CACHE_KEY]: loopToggle.checked });
-    });
 
     // ── Select All / Deselect All ──
     selectAllBtn.addEventListener('click', () => {
@@ -353,20 +346,14 @@
         refreshBtn.disabled = false;
     });
 
-    // ── Open Charts (Start Rotation) ──
+    // ── Open Grid ──
     openChartsBtn.addEventListener('click', () => {
         if (checkedSet.size === 0) return;
 
-        const isLoop = loopToggle.checked;
-        chrome.storage.local.set({ [LOOP_CACHE_KEY]: isLoop });
+        // The grid page will independently read the checkedSymbolsCache
+        chrome.tabs.create({ url: chrome.runtime.getURL('grid.html') });
 
-        chrome.runtime.sendMessage({
-            type: 'START_ROTATION',
-            symbols: Array.from(checkedSet),
-            isLoop: isLoop
-        });
-
-        openChartsBtn.textContent = '✓ Rotation Started!';
+        openChartsBtn.textContent = '✓ Grid Opened!';
         openChartsBtn.disabled = true;
         setTimeout(() => {
             openChartsBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Open Charts`;
