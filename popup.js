@@ -20,7 +20,7 @@
     const selectedCountEl = document.getElementById('selectedCount');
     const openChartsBtn = document.getElementById('openChartsBtn');
     const refreshBtn = document.getElementById('refreshBtn');
-    const filterBtns = document.querySelectorAll('.filter-btn');
+    const filterBar = document.getElementById('filterBar');
 
     // ── Load from cache ONLY. Never auto-fetch. ──
     async function init() {
@@ -28,6 +28,7 @@
 
         if (cached[CACHE_KEY] && cached[CACHE_KEY].length > 0) {
             allSymbols = cached[CACHE_KEY];
+            updateDynamicFilters();
             applyFilter();
             renderList();
         } else {
@@ -96,7 +97,7 @@
                 if (!Array.isArray(batch) || batch.length === 0) break;
 
                 for (const s of batch) {
-                    const full = `${s.exchange || s.prefix || ''}:${s.symbol}`;
+                    const full = `${s.source_id || s.exchange || s.prefix || ''}:${s.symbol}`;
                     if (seen.has(full)) continue; // skip duplicates
                     seen.add(full);
 
@@ -104,11 +105,12 @@
                         symbol: s.symbol,
                         exchange: s.exchange || s.prefix || '',
                         description: s.description || '',
-                        type: s.type || '',
+                        type: (s.type || '').toLowerCase(),
                         full
                     });
                 }
 
+                updateDynamicFilters();
                 applyFilter();
                 renderList();
 
@@ -137,12 +139,7 @@
         filteredSymbols = allSymbols.filter(s => {
             // Type filter
             if (currentTypeFilter !== 'all') {
-                const t = (s.type || '').toLowerCase();
-                if (currentTypeFilter === 'crypto' && !t.includes('crypto')) return false;
-                if (currentTypeFilter === 'stock' && !t.includes('stock')) return false;
-                if (currentTypeFilter === 'forex' && !(t.includes('forex') || t.includes('cfd'))) return false;
-                if (currentTypeFilter === 'index' && !t.includes('index')) return false;
-                if (currentTypeFilter === 'futures' && !t.includes('futures')) return false;
+                if (s.type !== currentTypeFilter) return false;
             }
 
             // Text search
@@ -154,6 +151,42 @@
 
             return true;
         });
+    }
+
+    // ── Update Dynamic Filters ──
+    function updateDynamicFilters() {
+        if (!filterBar) return;
+        const types = new Set();
+        for (const s of allSymbols) {
+            if (s.type) types.add(s.type);
+        }
+
+        const sortedTypes = Array.from(types).sort();
+
+        const existingTypes = new Set();
+        filterBar.querySelectorAll('.filter-btn').forEach(btn => {
+            existingTypes.add(btn.dataset.type);
+        });
+
+        const fragment = document.createDocumentFragment();
+        let added = false;
+
+        for (const t of sortedTypes) {
+            if (!existingTypes.has(t) && t !== 'all') {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn';
+                if (currentTypeFilter === t) btn.classList.add('active');
+                btn.dataset.type = t;
+                btn.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+                fragment.appendChild(btn);
+                existingTypes.add(t);
+                added = true;
+            }
+        }
+
+        if (added) {
+            filterBar.appendChild(fragment);
+        }
     }
 
     // ── Render the symbol list ──
@@ -239,7 +272,10 @@
 
     function getTypeClass(type) {
         const t = (type || '').toLowerCase();
-        if (t.includes('crypto')) return 'type-crypto';
+        if (t === 'spot' || t === 'swap' || t.includes('crypto')) return 'type-crypto';
+        if (t === 'commodity') return 'type-futures';
+        if (t === 'fund') return 'type-stock';
+        if (t === 'bond') return 'type-forex';
         if (t.includes('stock')) return 'type-stock';
         if (t.includes('forex') || t.includes('cfd')) return 'type-forex';
         if (t.includes('index')) return 'type-index';
@@ -261,15 +297,17 @@
     });
 
     // ── Type filter buttons ──
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTypeFilter = btn.dataset.type;
-            applyFilter();
-            renderList();
+    if (filterBar) {
+        filterBar.addEventListener('click', (e) => {
+            if (e.target.classList.contains('filter-btn')) {
+                filterBar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentTypeFilter = e.target.dataset.type;
+                applyFilter();
+                renderList();
+            }
         });
-    });
+    }
 
     // ── Select All / Deselect All ──
     selectAllBtn.addEventListener('click', () => {
