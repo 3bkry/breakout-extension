@@ -1,15 +1,5 @@
 // The content script runs in the isolated extension environment.
-// We need to inject a script into the main page environment to override the native WebSocket.
-
-function injectScript(file_path) {
-    var s = document.createElement('script');
-    s.setAttribute('type', 'text/javascript');
-    s.setAttribute('src', file_path);
-    (document.head || document.documentElement).appendChild(s);
-}
-
-// Inject inject.js into the DOM so it runs in the page's context
-injectScript(chrome.runtime.getURL('inject.js'));
+// inject.js is now injected natively into the MAIN world by manifest.json.
 
 // Listen for messages from the injected script
 window.addEventListener("message", function (event) {
