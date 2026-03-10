@@ -5,7 +5,8 @@
   "description": "Intercepts TradingView WebSockets and forwards messages. Launch symbol charts from a popup.",
   "permissions": [
     "scripting",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "host_permissions": [
     "*://*.tradingview.com/*",

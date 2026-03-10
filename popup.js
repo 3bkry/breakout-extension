@@ -1,8 +1,9 @@
 // Symbol Launcher — popup.js
-// Fetches symbols by injecting into a TradingView tab (correct origin + cookies).
+// Caches symbols in chrome.storage.local. Fetches fresh data only on first load or manual refresh.
 
 (function () {
     const CHART_BASE = 'https://www.tradingview.com/chart?symbol=';
+    const CACHE_KEY = 'symbolCache';
 
     let allSymbols = [];
     let filteredSymbols = [];
@@ -15,11 +16,30 @@
     const deselectAllBtn = document.getElementById('deselectAllBtn');
     const selectedCountEl = document.getElementById('selectedCount');
     const openChartsBtn = document.getElementById('openChartsBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
 
-    // ── Fetch ALL symbols by paginating inside a TradingView tab ──
-    async function fetchSymbols() {
+    // ── Load from cache or fetch fresh ──
+    async function init() {
+        const cached = await chrome.storage.local.get(CACHE_KEY);
+
+        if (cached[CACHE_KEY] && cached[CACHE_KEY].length > 0) {
+            allSymbols = cached[CACHE_KEY];
+            filteredSymbols = [...allSymbols];
+            renderList();
+        } else {
+            await fetchAndCache();
+        }
+    }
+
+    // ── Fetch ALL symbols by paginating inside a TradingView tab, then cache ──
+    async function fetchAndCache() {
+        symbolListEl.innerHTML = `
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <span id="loadProgress">Loading symbols... 0 fetched</span>
+            </div>`;
+
         try {
-            // Find an open TradingView tab
             const tabs = await chrome.tabs.query({ url: '*://*.tradingview.com/*' });
 
             if (tabs.length === 0) {
@@ -34,12 +54,10 @@
 
             const tabId = tabs[0].id;
 
-            // Paginate through ALL results inside the page context
             const results = await chrome.scripting.executeScript({
                 target: { tabId },
                 world: 'MAIN',
                 func: async () => {
-                    const PAGE_SIZE = 50;
                     const allResults = [];
                     let start = 0;
 
@@ -56,7 +74,6 @@
                         allResults.push(...batch);
                         start += batch.length;
 
-                        // Safety cap at 15000
                         if (start >= 15000) break;
                     }
 
@@ -73,6 +90,9 @@
                 type: s.type || '',
                 full: `${s.exchange || s.prefix || ''}:${s.symbol}`
             }));
+
+            // Save to cache
+            await chrome.storage.local.set({ [CACHE_KEY]: allSymbols });
 
             filteredSymbols = [...allSymbols];
             renderList();
@@ -136,13 +156,8 @@
             row.appendChild(info);
             row.appendChild(typeSpan);
 
-            // Click handler — toggle checkbox
             row.addEventListener('click', (e) => {
-                if (e.target === cb) {
-                    // Checkbox handles itself
-                } else {
-                    cb.checked = !cb.checked;
-                }
+                if (e.target !== cb) cb.checked = !cb.checked;
 
                 if (cb.checked) {
                     checkedSet.add(sym.full);
@@ -195,17 +210,23 @@
 
     // ── Select All / Deselect All ──
     selectAllBtn.addEventListener('click', () => {
-        for (const sym of filteredSymbols) {
-            checkedSet.add(sym.full);
-        }
+        for (const sym of filteredSymbols) checkedSet.add(sym.full);
         renderList();
     });
 
     deselectAllBtn.addEventListener('click', () => {
-        for (const sym of filteredSymbols) {
-            checkedSet.delete(sym.full);
-        }
+        for (const sym of filteredSymbols) checkedSet.delete(sym.full);
         renderList();
+    });
+
+    // ── Refresh button — clear cache and re-fetch ──
+    refreshBtn.addEventListener('click', async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = '⏳';
+        await chrome.storage.local.remove(CACHE_KEY);
+        await fetchAndCache();
+        refreshBtn.textContent = '🔄';
+        refreshBtn.disabled = false;
     });
 
     // ── Open Charts ──
@@ -217,7 +238,6 @@
             chrome.tabs.create({ url, active: false });
         }
 
-        // Brief visual feedback
         openChartsBtn.textContent = '✓ Tabs Opened!';
         openChartsBtn.disabled = true;
         setTimeout(() => {
@@ -227,5 +247,5 @@
     });
 
     // ── Init ──
-    fetchSymbols();
+    init();
 })();
