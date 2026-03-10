@@ -144,6 +144,42 @@ body {
     border: 1px solid rgba(34, 211, 238, 0.2);
 }
 
+/* ── Filter Bar ── */
+.filter-bar {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    background: #0d121b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    overflow-x: auto;
+}
+
+.filter-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.filter-btn:hover {
+    background: rgba(34, 211, 238, 0.06);
+    color: #94a3b8;
+}
+
+.filter-btn.active {
+    background: rgba(34, 211, 238, 0.12);
+    border-color: rgba(34, 211, 238, 0.25);
+    color: #22d3ee;
+}
+
 /* ── Toolbar ── */
 .toolbar {
     display: flex;

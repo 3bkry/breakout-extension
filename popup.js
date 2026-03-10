@@ -1,5 +1,5 @@
 // Symbol Launcher — popup.js
-// Caches symbols in chrome.storage.local. Streams batches progressively on first load.
+// Caches symbols in chrome.storage.local. Only re-fetches on manual refresh.
 
 (function () {
     const CHART_BASE = 'https://www.tradingview.com/chart?symbol=';
@@ -9,6 +9,8 @@
     let filteredSymbols = [];
     let checkedSet = new Set();
     let currentQuery = '';
+    let currentTypeFilter = 'all';
+    let isFetching = false;
 
     const searchInput = document.getElementById('searchInput');
     const countBadge = document.getElementById('countBadge');
@@ -18,8 +20,9 @@
     const selectedCountEl = document.getElementById('selectedCount');
     const openChartsBtn = document.getElementById('openChartsBtn');
     const refreshBtn = document.getElementById('refreshBtn');
+    const filterBtns = document.querySelectorAll('.filter-btn');
 
-    // ── Load from cache or fetch fresh ──
+    // ── Load from cache ONLY. Never auto-fetch. ──
     async function init() {
         const cached = await chrome.storage.local.get(CACHE_KEY);
 
@@ -28,7 +31,13 @@
             applyFilter();
             renderList();
         } else {
-            await fetchAndCache();
+            // No cache — show prompt to click refresh
+            symbolListEl.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size:28px;margin-bottom:8px">📋</span>
+                    <b>No symbols cached yet</b><br>
+                    <small>Click the 🔄 button above to load symbols.<br>Make sure a TradingView tab is open.</small>
+                </div>`;
         }
     }
 
@@ -49,10 +58,16 @@
         return results[0].result || [];
     }
 
-    // ── Progressive fetch: render each batch as it arrives, then cache all ──
+    // ── Progressive fetch (only called by refresh button) ──
     async function fetchAndCache() {
+        if (isFetching) return;
+        isFetching = true;
+
+        // Reset
         allSymbols = [];
         filteredSymbols = [];
+        const seen = new Set(); // deduplicate
+
         symbolListEl.innerHTML = `
             <div class="loading-state">
                 <div class="spinner"></div>
@@ -67,8 +82,9 @@
                     <div class="empty-state">
                         <span style="font-size:24px;margin-bottom:8px">🌐</span>
                         <b>No TradingView tab open</b><br>
-                        <small>Please open <a href="https://www.tradingview.com" target="_blank" style="color:#22d3ee">tradingview.com</a> first, then reopen this popup.</small>
+                        <small>Please open <a href="https://www.tradingview.com" target="_blank" style="color:#22d3ee">tradingview.com</a> first.</small>
                     </div>`;
+                isFetching = false;
                 return;
             }
 
@@ -79,15 +95,20 @@
                 const batch = await fetchPage(tabId, start);
                 if (!Array.isArray(batch) || batch.length === 0) break;
 
-                const mapped = batch.map(s => ({
-                    symbol: s.symbol,
-                    exchange: s.exchange || s.prefix || '',
-                    description: s.description || '',
-                    type: s.type || '',
-                    full: `${s.exchange || s.prefix || ''}:${s.symbol}`
-                }));
+                for (const s of batch) {
+                    const full = `${s.exchange || s.prefix || ''}:${s.symbol}`;
+                    if (seen.has(full)) continue; // skip duplicates
+                    seen.add(full);
 
-                allSymbols.push(...mapped);
+                    allSymbols.push({
+                        symbol: s.symbol,
+                        exchange: s.exchange || s.prefix || '',
+                        description: s.description || '',
+                        type: s.type || '',
+                        full
+                    });
+                }
+
                 applyFilter();
                 renderList();
 
@@ -95,7 +116,7 @@
                 if (start >= 15000) break;
             }
 
-            // Save completed list to cache
+            // Save to cache
             await chrome.storage.local.set({ [CACHE_KEY]: allSymbols });
 
         } catch (err) {
@@ -103,30 +124,48 @@
             if (allSymbols.length === 0) {
                 symbolListEl.innerHTML = `<div class="empty-state">Failed to load symbols.<br><small>${err.message}</small></div>`;
             }
-            // If we already have some, just stop and cache what we have
             if (allSymbols.length > 0) {
                 await chrome.storage.local.set({ [CACHE_KEY]: allSymbols });
             }
+        } finally {
+            isFetching = false;
         }
     }
 
-    // ── Apply current search filter ──
+    // ── Apply search + type filter ──
     function applyFilter() {
-        if (!currentQuery) {
-            filteredSymbols = [...allSymbols];
-        } else {
-            filteredSymbols = allSymbols.filter(s =>
-                s.symbol.toLowerCase().includes(currentQuery) ||
-                s.exchange.toLowerCase().includes(currentQuery) ||
-                s.description.toLowerCase().includes(currentQuery)
-            );
-        }
+        filteredSymbols = allSymbols.filter(s => {
+            // Type filter
+            if (currentTypeFilter !== 'all') {
+                const t = (s.type || '').toLowerCase();
+                if (currentTypeFilter === 'crypto' && !t.includes('crypto')) return false;
+                if (currentTypeFilter === 'stock' && !t.includes('stock')) return false;
+                if (currentTypeFilter === 'forex' && !(t.includes('forex') || t.includes('cfd'))) return false;
+                if (currentTypeFilter === 'index' && !t.includes('index')) return false;
+                if (currentTypeFilter === 'futures' && !t.includes('futures')) return false;
+            }
+
+            // Text search
+            if (currentQuery) {
+                return s.symbol.toLowerCase().includes(currentQuery) ||
+                    s.exchange.toLowerCase().includes(currentQuery) ||
+                    s.description.toLowerCase().includes(currentQuery);
+            }
+
+            return true;
+        });
     }
 
     // ── Render the symbol list ──
     function renderList() {
-        if (filteredSymbols.length === 0 && allSymbols.length === 0) {
-            symbolListEl.innerHTML = '<div class="empty-state">No symbols found</div>';
+        if (filteredSymbols.length === 0 && allSymbols.length > 0) {
+            symbolListEl.innerHTML = '<div class="empty-state">No symbols match your filter</div>';
+            countBadge.textContent = '0';
+            updateFooter();
+            return;
+        }
+
+        if (filteredSymbols.length === 0) {
             countBadge.textContent = '0';
             updateFooter();
             return;
@@ -221,6 +260,17 @@
         renderList();
     });
 
+    // ── Type filter buttons ──
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTypeFilter = btn.dataset.type;
+            applyFilter();
+            renderList();
+        });
+    });
+
     // ── Select All / Deselect All ──
     selectAllBtn.addEventListener('click', () => {
         for (const sym of filteredSymbols) checkedSet.add(sym.full);
@@ -232,8 +282,9 @@
         renderList();
     });
 
-    // ── Refresh button — clear cache and re-fetch progressively ──
+    // ── Refresh button — clear cache and re-fetch ──
     refreshBtn.addEventListener('click', async () => {
+        if (isFetching) return;
         refreshBtn.disabled = true;
         refreshBtn.textContent = '⏳';
         await chrome.storage.local.remove(CACHE_KEY);
