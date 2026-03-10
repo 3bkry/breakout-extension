@@ -1,15 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Trading Breakout",
-  "version": "1.0",
-  "description": "Intercepts TradingView WebSockets and forwards messages to a local server.",
+  "version": "1.1",
+  "description": "Intercepts TradingView WebSockets and forwards messages. Launch symbol charts from a popup.",
   "permissions": [
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.tradingview.com/*",
+    "*://symbol-search.tradingview.com/*",
     "https://breakout-alert.vercel.app/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Symbol Launcher"
+  },
   "content_scripts": [
     {
       "matches": [

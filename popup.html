@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbol Launcher</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <header class="popup-header">
+            <div class="brand">
+                <span class="brand-icon">⚡</span>
+                <div>
+                    <h1>Symbol Launcher</h1>
+                    <span class="brand-sub">Open TradingView Charts</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="search-bar">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Search symbols..." autocomplete="off" />
+            <span id="countBadge" class="count-badge">0</span>
+        </div>
+
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button id="selectAllBtn" class="tool-btn">Select All</button>
+                <button id="deselectAllBtn" class="tool-btn">Deselect All</button>
+            </div>
+            <div class="toolbar-right">
+                <span id="selectedCount" class="selected-count">0 selected</span>
+            </div>
+        </div>
+
+        <div id="symbolList" class="symbol-list">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading symbols...</span>
+            </div>
+        </div>
+
+        <footer class="popup-footer">
+            <button id="openChartsBtn" class="open-btn" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Open Charts
+            </button>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
