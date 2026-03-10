@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Trading Breakout",
+  "version": "1.0",
+  "description": "Intercepts TradingView WebSockets and forwards messages to a local server.",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.tradingview.com/*",
+    "https://breakout-alert.vercel.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.tradingview.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inject.js"
+      ],
+      "matches": [
+        "*://*.tradingview.com/*"
+      ]
+    }
+  ]
+}
