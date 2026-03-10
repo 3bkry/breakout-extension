@@ -1,5 +1,5 @@
 // Symbol Launcher — popup.js
-// Caches symbols in chrome.storage.local. Fetches fresh data only on first load or manual refresh.
+// Caches symbols in chrome.storage.local. Streams batches progressively on first load.
 
 (function () {
     const CHART_BASE = 'https://www.tradingview.com/chart?symbol=';
@@ -8,6 +8,7 @@
     let allSymbols = [];
     let filteredSymbols = [];
     let checkedSet = new Set();
+    let currentQuery = '';
 
     const searchInput = document.getElementById('searchInput');
     const countBadge = document.getElementById('countBadge');
@@ -24,19 +25,38 @@
 
         if (cached[CACHE_KEY] && cached[CACHE_KEY].length > 0) {
             allSymbols = cached[CACHE_KEY];
-            filteredSymbols = [...allSymbols];
+            applyFilter();
             renderList();
         } else {
             await fetchAndCache();
         }
     }
 
-    // ── Fetch ALL symbols by paginating inside a TradingView tab, then cache ──
+    // ── Fetch one page from TV tab ──
+    async function fetchPage(tabId, start) {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            args: [start],
+            func: async (startOffset) => {
+                const url = `https://symbol-search.tradingview.com/symbol_search/v3/?text=&hl=1&exchange=&lang=en&search_type=undefined&start=${startOffset}&domain=production&sort_by_country=US&promo=true`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                return data.symbols || data;
+            }
+        });
+        return results[0].result || [];
+    }
+
+    // ── Progressive fetch: render each batch as it arrives, then cache all ──
     async function fetchAndCache() {
+        allSymbols = [];
+        filteredSymbols = [];
         symbolListEl.innerHTML = `
             <div class="loading-state">
                 <div class="spinner"></div>
-                <span id="loadProgress">Loading symbols... 0 fetched</span>
+                <span>Connecting to TradingView...</span>
             </div>`;
 
         try {
@@ -53,58 +73,59 @@
             }
 
             const tabId = tabs[0].id;
+            let start = 0;
 
-            const results = await chrome.scripting.executeScript({
-                target: { tabId },
-                world: 'MAIN',
-                func: async () => {
-                    const allResults = [];
-                    let start = 0;
+            while (true) {
+                const batch = await fetchPage(tabId, start);
+                if (!Array.isArray(batch) || batch.length === 0) break;
 
-                    while (true) {
-                        const url = `https://symbol-search.tradingview.com/symbol_search/v3/?text=&hl=1&exchange=&lang=en&search_type=undefined&start=${start}&domain=production&sort_by_country=US&promo=true`;
-                        const res = await fetch(url);
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        const data = await res.json();
-                        const symbols = data.symbols || data;
-                        const batch = Array.isArray(symbols) ? symbols : [];
+                const mapped = batch.map(s => ({
+                    symbol: s.symbol,
+                    exchange: s.exchange || s.prefix || '',
+                    description: s.description || '',
+                    type: s.type || '',
+                    full: `${s.exchange || s.prefix || ''}:${s.symbol}`
+                }));
 
-                        if (batch.length === 0) break;
+                allSymbols.push(...mapped);
+                applyFilter();
+                renderList();
 
-                        allResults.push(...batch);
-                        start += batch.length;
+                start += batch.length;
+                if (start >= 15000) break;
+            }
 
-                        if (start >= 15000) break;
-                    }
-
-                    return allResults;
-                }
-            });
-
-            const symbols = results[0].result || [];
-
-            allSymbols = symbols.map(s => ({
-                symbol: s.symbol,
-                exchange: s.exchange || s.prefix || '',
-                description: s.description || '',
-                type: s.type || '',
-                full: `${s.exchange || s.prefix || ''}:${s.symbol}`
-            }));
-
-            // Save to cache
+            // Save completed list to cache
             await chrome.storage.local.set({ [CACHE_KEY]: allSymbols });
 
-            filteredSymbols = [...allSymbols];
-            renderList();
         } catch (err) {
             console.error('[Symbol Launcher] Fetch error:', err);
-            symbolListEl.innerHTML = `<div class="empty-state">Failed to load symbols.<br><small>${err.message}</small></div>`;
+            if (allSymbols.length === 0) {
+                symbolListEl.innerHTML = `<div class="empty-state">Failed to load symbols.<br><small>${err.message}</small></div>`;
+            }
+            // If we already have some, just stop and cache what we have
+            if (allSymbols.length > 0) {
+                await chrome.storage.local.set({ [CACHE_KEY]: allSymbols });
+            }
+        }
+    }
+
+    // ── Apply current search filter ──
+    function applyFilter() {
+        if (!currentQuery) {
+            filteredSymbols = [...allSymbols];
+        } else {
+            filteredSymbols = allSymbols.filter(s =>
+                s.symbol.toLowerCase().includes(currentQuery) ||
+                s.exchange.toLowerCase().includes(currentQuery) ||
+                s.description.toLowerCase().includes(currentQuery)
+            );
         }
     }
 
     // ── Render the symbol list ──
     function renderList() {
-        if (filteredSymbols.length === 0) {
+        if (filteredSymbols.length === 0 && allSymbols.length === 0) {
             symbolListEl.innerHTML = '<div class="empty-state">No symbols found</div>';
             countBadge.textContent = '0';
             updateFooter();
@@ -195,16 +216,8 @@
 
     // ── Search / filter ──
     searchInput.addEventListener('input', () => {
-        const q = searchInput.value.trim().toLowerCase();
-        if (!q) {
-            filteredSymbols = [...allSymbols];
-        } else {
-            filteredSymbols = allSymbols.filter(s =>
-                s.symbol.toLowerCase().includes(q) ||
-                s.exchange.toLowerCase().includes(q) ||
-                s.description.toLowerCase().includes(q)
-            );
-        }
+        currentQuery = searchInput.value.trim().toLowerCase();
+        applyFilter();
         renderList();
     });
 
@@ -219,7 +232,7 @@
         renderList();
     });
 
-    // ── Refresh button — clear cache and re-fetch ──
+    // ── Refresh button — clear cache and re-fetch progressively ──
     refreshBtn.addEventListener('click', async () => {
         refreshBtn.disabled = true;
         refreshBtn.textContent = '⏳';
