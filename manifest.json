@@ -14,6 +14,9 @@
     "*://symbol-search.tradingview.com/*",
     "https://breakout-alert.vercel.app/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Symbol Launcher"

@@ -4,6 +4,8 @@
 (function () {
     const CHART_BASE = 'https://www.tradingview.com/chart?symbol=';
     const CACHE_KEY = 'symbolCache';
+    const CHECKED_CACHE_KEY = 'checkedSymbolsCache';
+    const LOOP_CACHE_KEY = 'loopToggleCache';
 
     let allSymbols = [];
     let filteredSymbols = [];
@@ -21,10 +23,23 @@
     const openChartsBtn = document.getElementById('openChartsBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const filterBar = document.getElementById('filterBar');
+    const loopToggle = document.getElementById('loopToggle');
+
+    // ── Save Checked Set ──
+    async function saveChecked() {
+        await chrome.storage.local.set({ [CHECKED_CACHE_KEY]: Array.from(checkedSet) });
+    }
 
     // ── Load from cache ONLY. Never auto-fetch. ──
     async function init() {
-        const cached = await chrome.storage.local.get(CACHE_KEY);
+        const cached = await chrome.storage.local.get([CACHE_KEY, CHECKED_CACHE_KEY, LOOP_CACHE_KEY]);
+
+        if (cached[CHECKED_CACHE_KEY]) {
+            checkedSet = new Set(cached[CHECKED_CACHE_KEY]);
+        }
+        if (cached[LOOP_CACHE_KEY] !== undefined) {
+            loopToggle.checked = cached[LOOP_CACHE_KEY];
+        }
 
         if (cached[CACHE_KEY] && cached[CACHE_KEY].length > 0) {
             allSymbols = cached[CACHE_KEY];
@@ -260,6 +275,7 @@
                     row.classList.remove('checked');
                 }
                 updateFooter();
+                saveChecked(); // save on toggle
             });
 
             fragment.appendChild(row);
@@ -309,15 +325,21 @@
         });
     }
 
+    loopToggle.addEventListener('change', () => {
+        chrome.storage.local.set({ [LOOP_CACHE_KEY]: loopToggle.checked });
+    });
+
     // ── Select All / Deselect All ──
     selectAllBtn.addEventListener('click', () => {
         for (const sym of filteredSymbols) checkedSet.add(sym.full);
         renderList();
+        saveChecked();
     });
 
     deselectAllBtn.addEventListener('click', () => {
         for (const sym of filteredSymbols) checkedSet.delete(sym.full);
         renderList();
+        saveChecked();
     });
 
     // ── Refresh button — clear cache and re-fetch ──
@@ -331,16 +353,20 @@
         refreshBtn.disabled = false;
     });
 
-    // ── Open Charts ──
+    // ── Open Charts (Start Rotation) ──
     openChartsBtn.addEventListener('click', () => {
         if (checkedSet.size === 0) return;
 
-        for (const symbolFull of checkedSet) {
-            const url = CHART_BASE + encodeURIComponent(symbolFull);
-            chrome.tabs.create({ url, active: false });
-        }
+        const isLoop = loopToggle.checked;
+        chrome.storage.local.set({ [LOOP_CACHE_KEY]: isLoop });
 
-        openChartsBtn.textContent = '✓ Tabs Opened!';
+        chrome.runtime.sendMessage({
+            type: 'START_ROTATION',
+            symbols: Array.from(checkedSet),
+            isLoop: isLoop
+        });
+
+        openChartsBtn.textContent = '✓ Rotation Started!';
         openChartsBtn.disabled = true;
         setTimeout(() => {
             openChartsBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Open Charts`;
