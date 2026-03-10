@@ -16,7 +16,7 @@
     const selectedCountEl = document.getElementById('selectedCount');
     const openChartsBtn = document.getElementById('openChartsBtn');
 
-    // ── Fetch symbols by executing inside a TradingView tab ──
+    // ── Fetch ALL symbols by paginating inside a TradingView tab ──
     async function fetchSymbols() {
         try {
             // Find an open TradingView tab
@@ -34,23 +34,39 @@
 
             const tabId = tabs[0].id;
 
-            // Execute the fetch inside the page context (MAIN world)
-            // This inherits the page's origin and cookies so the API won't 403
+            // Paginate through ALL results inside the page context
             const results = await chrome.scripting.executeScript({
                 target: { tabId },
                 world: 'MAIN',
                 func: async () => {
-                    const url = 'https://symbol-search.tradingview.com/symbol_search/v3/?text=&hl=1&exchange=&lang=en&search_type=undefined&start=0&domain=production&sort_by_country=US&promo=true';
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    return await res.json();
+                    const PAGE_SIZE = 50;
+                    const allResults = [];
+                    let start = 0;
+
+                    while (true) {
+                        const url = `https://symbol-search.tradingview.com/symbol_search/v3/?text=&hl=1&exchange=&lang=en&search_type=undefined&start=${start}&domain=production&sort_by_country=US&promo=true`;
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        const data = await res.json();
+                        const symbols = data.symbols || data;
+                        const batch = Array.isArray(symbols) ? symbols : [];
+
+                        if (batch.length === 0) break;
+
+                        allResults.push(...batch);
+                        start += batch.length;
+
+                        // Safety cap at 15000
+                        if (start >= 15000) break;
+                    }
+
+                    return allResults;
                 }
             });
 
-            const data = results[0].result;
-            const symbols = data.symbols || data;
+            const symbols = results[0].result || [];
 
-            allSymbols = (Array.isArray(symbols) ? symbols : []).map(s => ({
+            allSymbols = symbols.map(s => ({
                 symbol: s.symbol,
                 exchange: s.exchange || s.prefix || '',
                 description: s.description || '',
