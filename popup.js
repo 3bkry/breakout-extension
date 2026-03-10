@@ -1,10 +1,8 @@
 // Symbol Launcher — popup.js
-// Fetches symbols from TradingView's search API and lets the user open chart tabs.
+// Fetches symbols by injecting into a TradingView tab (correct origin + cookies).
 
 (function () {
-    const API_URL = 'https://symbol-search.tradingview.com/symbol_search/v3/';
     const CHART_BASE = 'https://www.tradingview.com/chart?symbol=';
-    const PAGE_SIZE = 100;
 
     let allSymbols = [];
     let filteredSymbols = [];
@@ -18,34 +16,38 @@
     const selectedCountEl = document.getElementById('selectedCount');
     const openChartsBtn = document.getElementById('openChartsBtn');
 
-    // ── Fetch symbols from TradingView API ──
+    // ── Fetch symbols by executing inside a TradingView tab ──
     async function fetchSymbols() {
         try {
-            const params = new URLSearchParams({
-                text: '',
-                hl: '1',
-                exchange: '',
-                lang: 'en',
-                search_type: 'undefined',
-                start: '0',
-                domain: 'production',
-                sort_by_country: 'US',
-                promo: 'true'
-            });
+            // Find an open TradingView tab
+            const tabs = await chrome.tabs.query({ url: '*://*.tradingview.com/*' });
 
-            const res = await fetch(`${API_URL}?${params.toString()}`, {
-                headers: {
-                    'accept': '*/*',
-                    'origin': 'https://www.tradingview.com',
-                    'referer': 'https://www.tradingview.com/'
+            if (tabs.length === 0) {
+                symbolListEl.innerHTML = `
+                    <div class="empty-state">
+                        <span style="font-size:24px;margin-bottom:8px">🌐</span>
+                        <b>No TradingView tab open</b><br>
+                        <small>Please open <a href="https://www.tradingview.com" target="_blank" style="color:#22d3ee">tradingview.com</a> first, then reopen this popup.</small>
+                    </div>`;
+                return;
+            }
+
+            const tabId = tabs[0].id;
+
+            // Execute the fetch inside the page context (MAIN world)
+            // This inherits the page's origin and cookies so the API won't 403
+            const results = await chrome.scripting.executeScript({
+                target: { tabId },
+                world: 'MAIN',
+                func: async () => {
+                    const url = 'https://symbol-search.tradingview.com/symbol_search/v3/?text=&hl=1&exchange=&lang=en&search_type=undefined&start=0&domain=production&sort_by_country=US&promo=true';
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return await res.json();
                 }
             });
 
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-            const data = await res.json();
-
-            // data.symbols is the array
+            const data = results[0].result;
             const symbols = data.symbols || data;
 
             allSymbols = (Array.isArray(symbols) ? symbols : []).map(s => ({
