@@ -25,7 +25,7 @@ window.addEventListener("message", function (event) {
 }, false);
 
 function forwardToLocalServer(message, isOutgoing) {
-    const url = "https://breakout-alert.vercel.app/api/tradingview/listen";
+    const url = "https://breakout.investingcube.com/api/tradingview/listen";
     const urlParams = new URLSearchParams(window.location.search);
     const symbol = urlParams.get('symbol');
 
@@ -45,7 +45,7 @@ function forwardToLocalServer(message, isOutgoing) {
             const errText = await res.text();
             console.error("[Trading Breakout] API Failed with status:", res.status, errText);
         } else {
-            console.log("[Trading Breakout] Successfully sent to Vercel.");
+            console.log("[Trading Breakout] Successfully sent to porduction.");
         }
     }).catch(err => {
         console.error("[Trading Breakout] Fetch exception:", err);
