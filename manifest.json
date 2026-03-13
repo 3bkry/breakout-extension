@@ -12,7 +12,7 @@
   "host_permissions": [
     "*://*.tradingview.com/*",
     "*://symbol-search.tradingview.com/*",
-    "https://breakout-alert.vercel.app/*"
+    "https://breakout.investingcube.com/*"
   ],
   "background": {
     "service_worker": "background.js"
