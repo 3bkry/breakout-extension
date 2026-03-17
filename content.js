@@ -25,7 +25,7 @@ window.addEventListener("message", function (event) {
 }, false);
 
 function forwardToLocalServer(message, isOutgoing) {
-    const url = "https://www.investingcube.com/breakput/api/tradingview/listen";
+    const url = "https://www.investingcube.com/breakout/api/tradingview/listen";
     const urlParams = new URLSearchParams(window.location.search);
     const symbol = urlParams.get('symbol');
 

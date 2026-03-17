@@ -12,7 +12,7 @@
   "host_permissions": [
     "*://*.tradingview.com/*",
     "*://symbol-search.tradingview.com/*",
-    "https://www.investingcube.com/breakput/*"
+    "https://www.investingcube.com/breakout/*"
   ],
   "background": {
     "service_worker": "background.js"
