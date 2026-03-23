@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Trading Breakout",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Intercepts TradingView WebSockets and forwards messages. Launch symbol charts from a popup.",
   "permissions": [
     "scripting",

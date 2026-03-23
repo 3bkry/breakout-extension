@@ -25,8 +25,6 @@
         if (!shouldIntercept) return;
         ws.__proxied = true;
 
-        console.log("[Trading Breakout] Intercepted active WebSocket to:", url);
-
         // Capture incoming messages
         ws.addEventListener('message', function (event) {
             try {
@@ -76,6 +74,4 @@
     window.WebSocket.OPEN = OriginalWebSocket.OPEN;
     window.WebSocket.CLOSING = OriginalWebSocket.CLOSING;
     window.WebSocket.CLOSED = OriginalWebSocket.CLOSED;
-
-    console.log("[Trading Breakout] Native WebSocket constructor completely overridden.");
 })();

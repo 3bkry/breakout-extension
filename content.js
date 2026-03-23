@@ -16,9 +16,6 @@ window.addEventListener("message", function (event) {
             return;
         }
 
-        // Log in the extension context
-        console.log(`[Extension Content] Intercepted ${isOutgoing ? 'outgoing' : 'incoming'} WS msg:`, payload);
-
         // Forward the message to the local server
         forwardToLocalServer(payload, isOutgoing);
     }
@@ -44,8 +41,6 @@ function forwardToLocalServer(message, isOutgoing) {
         if (!res.ok) {
             const errText = await res.text();
             console.error("[Trading Breakout] API Failed with status:", res.status, errText);
-        } else {
-            console.log("[Trading Breakout] Successfully sent to porduction.");
         }
     }).catch(err => {
         console.error("[Trading Breakout] Fetch exception:", err);

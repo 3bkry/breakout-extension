@@ -6,6 +6,7 @@
     const CACHE_KEY = 'symbolCache';
     const CHECKED_CACHE_KEY = 'checkedSymbolsCache';
     const LOOP_CACHE_KEY = 'loopToggleCache';
+    const RELOAD_INTERVAL_KEY = 'reloadIntervalCache';
 
     let allSymbols = [];
     let filteredSymbols = [];
@@ -23,6 +24,7 @@
     const openChartsBtn = document.getElementById('openChartsBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const filterBar = document.getElementById('filterBar');
+    const reloadIntervalInput = document.getElementById('reloadInterval');
 
     // ── Save Checked Set ──
     async function saveChecked() {
@@ -31,7 +33,11 @@
 
     // ── Load from cache ONLY. Never auto-fetch. ──
     async function init() {
-        const cached = await chrome.storage.local.get([CACHE_KEY, CHECKED_CACHE_KEY]);
+        const cached = await chrome.storage.local.get([CACHE_KEY, CHECKED_CACHE_KEY, RELOAD_INTERVAL_KEY]);
+
+        if (cached[RELOAD_INTERVAL_KEY] !== undefined) {
+            reloadIntervalInput.value = cached[RELOAD_INTERVAL_KEY];
+        }
 
         if (cached[CHECKED_CACHE_KEY]) {
             checkedSet = new Set(cached[CHECKED_CACHE_KEY]);
@@ -360,6 +366,14 @@
             openChartsBtn.disabled = checkedSet.size === 0;
         }, 1500);
     });
+
+    // ── Save Auto Reload Interval ──
+    if (reloadIntervalInput) {
+        reloadIntervalInput.addEventListener('input', async () => {
+            const val = parseInt(reloadIntervalInput.value, 10);
+            await chrome.storage.local.set({ [RELOAD_INTERVAL_KEY]: isNaN(val) ? 0 : val });
+        });
+    }
 
     // ── Init ──
     init();

@@ -1,8 +1,10 @@
 const CHECKED_CACHE_KEY = 'checkedSymbolsCache';
+const RELOAD_INTERVAL_KEY = 'reloadIntervalCache';
 
 async function initGrid() {
-    const cached = await chrome.storage.local.get(CHECKED_CACHE_KEY);
+    const cached = await chrome.storage.local.get([CHECKED_CACHE_KEY, RELOAD_INTERVAL_KEY]);
     const symbols = cached[CHECKED_CACHE_KEY] || [];
+    const intervalMins = cached[RELOAD_INTERVAL_KEY] || 0;
 
     const container = document.getElementById('gridContainer');
 
@@ -44,6 +46,13 @@ async function initGrid() {
         iframe.allowFullscreen = true;
         container.appendChild(iframe);
     });
+
+    // Auto-reload logic
+    if (intervalMins > 0) {
+        setTimeout(() => {
+            location.reload();
+        }, intervalMins * 60 * 1000);
+    }
 }
 
 initGrid();
